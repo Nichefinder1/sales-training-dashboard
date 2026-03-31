@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nichefinders AI — Sales Training Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Satoshi:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ========== HEADER ========== -->
+  <header id="site-header">
+    <div class="header-inner">
+      <div class="logo-group">
+        <img src="logo.png" alt="Nichefinders AI" class="logo-img">
+        <span class="logo-divider"></span>
+        <span class="logo-subtitle">Sales Training Academy</span>
+      </div>
+      <div class="header-right">
+        <span class="user-pill" id="user-badge"></span>
+        <button id="switch-user-btn" class="btn btn-sm btn-ghost" title="Switch user">Switch User</button>
+        <button id="manager-view-btn" class="btn btn-sm btn-outline hidden" title="Manager view">Manager View</button>
+        <div id="name-display" class="name-badge hidden"></div>
+        <button id="name-edit-btn" class="btn btn-sm btn-outline" title="Set your name">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="name-btn-label">Set Name</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== NAME MODAL ========== -->
+  <div id="name-modal" class="modal-overlay hidden">
+    <div class="modal-box modal-sm">
+      <h3>Welcome, Salesperson</h3>
+      <p class="modal-desc">Enter your name to personalize your training experience.</p>
+      <input type="text" id="name-input" class="input" placeholder="Your full name" maxlength="60" autocomplete="off">
+      <div class="modal-actions">
+        <button id="name-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="name-save" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SWITCH USER MODAL ========== -->
+  <div id="switch-user-modal" class="modal-overlay hidden">
+    <div class="modal-box modal-sm">
+      <div class="modal-header">
+        <h3>Switch User</h3>
+        <button class="modal-close" id="switch-user-close">&times;</button>
+      </div>
+      <p class="modal-desc">Select a user profile or create a new one. Each user's progress is stored separately.</p>
+      <div id="switch-user-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+      <div class="modal-actions">
+        <button id="new-user-btn" class="btn btn-primary btn-sm">+ New User</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MANAGER MODAL ========== -->
+  <div id="manager-modal" class="modal-overlay hidden">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3>Manager View — All Users</h3>
+        <button class="modal-close" id="manager-close">&times;</button>
+      </div>
+      <p class="modal-desc">Access via <code>?manager=1</code> in the URL. Progress is read-only here.</p>
+      <div style="overflow-x:auto">
+        <table class="manager-table">
+          <thead><tr><th>Name/User</th><th>Progress</th><th>Modules</th><th>Quizzes</th><th>Scenarios</th><th>Certified</th></tr></thead>
+          <tbody id="manager-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>30-Day Sales Certification Program</h1>
+      <p class="hero-sub">Master the AI OS Partner Program. Close with confidence. Get certified.</p>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <span class="stat-value" id="overall-pct">0%</span>
+          <span class="stat-label">Overall Progress</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="days-remaining">30</span>
+          <span class="stat-label">Days Remaining</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="quizzes-passed">0/4</span>
+          <span class="stat-label">Quizzes Passed</span>
+        </div>
+      </div>
+      <div class="progress-bar-wrap hero-progress">
+        <div class="progress-bar-fill" id="overall-bar" style="width:0%"></div>
+      </div>
+    </section>
+
+    <!-- Week Cards -->
+    <section class="section" id="weeks-section">
+      <h2 class="section-title">Weekly Training Modules</h2>
+      <div class="week-grid" id="week-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="modal-overlay hidden">
+      <div class="modal-box modal-lg">
+        <div class="quiz-header">
+          <h3 id="quiz-title">Week 1 Quiz</h3>
+          <button class="modal-close" id="quiz-close">&times;</button>
+        </div>
+        <div id="quiz-body">
+          <!-- Questions rendered by JS -->
+        </div>
+        <div id="quiz-result" class="hidden">
+          <div id="quiz-result-inner"></div>
+        </div>
+        <div class="modal-actions">
+          <button id="quiz-submit" class="btn btn-primary">Submit Answers</button>
+          <button id="quiz-retry" class="btn btn-outline hidden">Try Again</button>
+          <button id="quiz-done" class="btn btn-ghost hidden">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Practice Scenarios -->
+    <section class="section" id="scenarios-section">
+      <h2 class="section-title">Practice Scenarios</h2>
+      <p class="section-desc">Click a card to expand the full scenario. Practice your pitch, handle objections, and mark as complete.</p>
+      <div class="scenario-grid" id="scenario-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Pitch Timer -->
+    <section class="section" id="timer-section">
+      <h2 class="section-title">Pitch Timer</h2>
+      <p class="section-desc">Practice your elevator pitch (30s) or full pitch (60s). Timer beeps at 5 seconds remaining.</p>
+      <div class="timer-container">
+        <div class="timer-display" id="timer-display">00:30</div>
+        <div class="timer-controls">
+          <button class="btn btn-outline" id="timer-30">30 Seconds</button>
+          <button class="btn btn-outline" id="timer-60">60 Seconds</button>
+        </div>
+        <div class="timer-controls">
+          <button class="btn btn-primary" id="timer-start">Start</button>
+          <button class="btn btn-ghost" id="timer-stop" disabled>Stop</button>
+          <button class="btn btn-ghost" id="timer-reset">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Templates -->
+    <section class="section" id="templates-section">
+      <h2 class="section-title">Templates &amp; Quick Access</h2>
+      <div class="template-grid" id="template-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- Certification -->
+    <section class="section" id="cert-section">
+      <h2 class="section-title">Certification Status</h2>
+      <div class="cert-container">
+        <div class="cert-checklist" id="cert-checklist">
+          <!-- Rendered by JS -->
+        </div>
+        <div id="cert-badge" class="cert-badge hidden">
+          <div class="cert-badge-inner">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CC5500" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span class="cert-badge-text">CERTIFIED</span>
+          </div>
+        </div>
+        <button id="print-cert" class="btn btn-primary hidden">Print Certificate</button>
+        <div class="progress-io">
+          <button id="export-progress" class="btn btn-ghost btn-sm">&#8595; Export Progress</button>
+          <button id="import-progress" class="btn btn-ghost btn-sm">&#8593; Import Progress</button>
+          <input type="file" id="import-file-input" accept=".json" style="display:none">
+        </div>
+      </div>
+    </section>
+
+    <!-- Printable Certificate (hidden, shown only for print) -->
+    <div id="print-certificate" class="print-certificate">
+      <div class="cert-inner">
+        <div class="cert-border">
+          <img src="logo.png" alt="Nichefinders AI" class="cert-logo-img">
+          <div class="cert-logo">Nichefinders AI</div>
+          <h2 class="cert-headline">Sales Certification</h2>
+          <p class="cert-sub">This certifies that</p>
+          <p class="cert-name" id="cert-print-name">—</p>
+          <p class="cert-body">Has successfully completed the 30-Day Sales Training Program for the AI OS Partner Program.</p>
+          <div class="cert-scores" id="cert-print-scores"></div>
+          <div class="cert-footer-row">
+            <div class="cert-date" id="cert-print-date"></div>
+            <div class="cert-signoff">
+              <div class="cert-sig-line"></div>
+              <div>Corey Reeder, CEO</div>
+              <div class="cert-sig-co">Nichefinders AI Agency</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========== FOOTER ========== -->
+  <footer>
+    <div class="footer-inner">
+      <span>Nichefinders AI &mdash; Sales Training Academy</span>
+      <span>Questions? Contact Corey Reeder</span>
+      <span>v1.0 &middot; March 2026</span>
+    </div>
+  </footer>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- Content Viewer Modal -->
+  <div id="content-modal" class="modal-overlay hidden">
+    <div class="modal-box modal-xl">
+      <div class="content-header">
+        <div>
+          <div class="content-week-label" id="content-week-label"></div>
+          <h3 id="content-title"></h3>
+        </div>
+        <button class="modal-close" id="content-close">&times;</button>
+      </div>
+      <div id="content-body" class="content-body"></div>
+      <div class="content-footer">
+        <label class="custom-check content-done-check">
+          <input type="checkbox" id="content-done-cb">
+          <span class="checkmark"></span>
+        </label>
+        <span class="content-done-label">Mark as complete</span>
+        <div class="content-nav">
+          <button class="btn btn-ghost" id="content-prev" title="Previous module">&larr; Previous</button>
+          <button class="btn btn-primary" id="content-next">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
