@@ -318,6 +318,122 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
+  // ─── Airtable Config ────────────────────────────────────────
+  const AIRTABLE_PAT = (window.NF_CONFIG || {}).AIRTABLE_PAT || atob('cGF0RTJwNTNSNkE2VUlJYTAuYjI5OWU3MGM0YTZlMzhlMzQ2YmU1NjZlODZhNDcxYWJlNjMzYTcxMDllMzAwYjkzMTk4YzZiMTJkOGJhYzc4Ng==');
+  const AIRTABLE_BASE = (window.NF_CONFIG || {}).AIRTABLE_BASE || 'appgNChM14muzXCR2';
+  const AIRTABLE_TABLE = (window.NF_CONFIG || {}).AIRTABLE_TABLE || 'Sales%20Training%20Progress';
+  const ALERT_URL = (window.NF_CONFIG || {}).ALERT_URL || 'http://129.80.92.76:3141/send-alert';
+
+  // ─── Password Gate ─────────────────────────────────────────
+  async function hashPassword (pw) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function fetchUserRecord () {
+    const user = getUser();
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${AIRTABLE_TABLE}?filterByFormula=${encodeURIComponent(`{User}="${user}"`)}`;
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_PAT}` } });
+      const data = await res.json();
+      if (data.records && data.records.length > 0) return data.records[0];
+    } catch (e) { console.warn('[Auth] Airtable fetch failed:', e); }
+    return null;
+  }
+
+  async function savePasswordHash (recordId, hash) {
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${AIRTABLE_TABLE}/${recordId}`;
+    await fetch(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${AIRTABLE_PAT}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { 'Password Hash': hash } })
+    });
+  }
+
+  function showPwError (msg) {
+    const el = $('#pw-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  function hidePwError () { $('#pw-error').classList.add('hidden'); }
+
+  function showApp () {
+    $('#pw-gate').classList.add('hidden');
+    document.querySelector('header').style.display = '';
+    document.querySelector('main').style.display = '';
+    document.querySelector('footer').style.display = '';
+  }
+
+  function hideApp () {
+    document.querySelector('header').style.display = 'none';
+    document.querySelector('main').style.display = 'none';
+    document.querySelector('footer').style.display = 'none';
+  }
+
+  async function passwordGate () {
+    hideApp();
+    const user = getUser();
+    if (user === 'default') { showApp(); init(); return; }
+
+    const record = await fetchUserRecord();
+    if (!record) { showApp(); init(); return; }
+
+    const existingHash = (record.fields || {})['Password Hash'];
+    const gate = $('#pw-gate');
+    const titleEl = $('#pw-title');
+    const descEl = $('#pw-desc');
+    const input = $('#pw-input');
+    const confirm = $('#pw-confirm');
+    const submitBtn = $('#pw-submit');
+
+    if (!existingHash) {
+      titleEl.textContent = 'Create Your Password';
+      descEl.textContent = 'Set a password to secure your training portal.';
+      confirm.classList.remove('hidden');
+      submitBtn.textContent = 'Create Password';
+
+      submitBtn.addEventListener('click', async function handler () {
+        hidePwError();
+        const pw = input.value;
+        const pw2 = confirm.value;
+        if (pw.length < 4) { showPwError('Password must be at least 4 characters.'); return; }
+        if (pw !== pw2) { showPwError('Passwords do not match.'); return; }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        const hash = await hashPassword(pw);
+        await savePasswordHash(record.id, hash);
+        submitBtn.removeEventListener('click', handler);
+        showApp();
+        init();
+      });
+    } else {
+      titleEl.textContent = 'Enter Password';
+      descEl.textContent = 'Enter your password to access your training portal.';
+      submitBtn.textContent = 'Sign In';
+
+      submitBtn.addEventListener('click', async function handler () {
+        hidePwError();
+        const pw = input.value;
+        if (!pw) { showPwError('Please enter your password.'); return; }
+        const hash = await hashPassword(pw);
+        if (hash === existingHash) {
+          submitBtn.removeEventListener('click', handler);
+          gate.classList.add('hidden');
+          init();
+        } else {
+          showPwError('Incorrect password. Try again.');
+          input.value = '';
+          input.focus();
+        }
+      });
+    }
+
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { if (!confirm.classList.contains('hidden')) confirm.focus(); else submitBtn.click(); } });
+    confirm.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitBtn.click(); });
+    input.focus();
+  }
+
   // ─── Init ──────────────────────────────────────────────────
   function init () {
     const d = state();
@@ -1208,10 +1324,6 @@
   }
 
   // ─── Airtable Sync ─────────────────────────────────────────
-  const AIRTABLE_PAT = (window.NF_CONFIG || {}).AIRTABLE_PAT || atob('cGF0RTJwNTNSNkE2VUlJYTAuYjI5OWU3MGM0YTZlMzhlMzQ2YmU1NjZlODZhNDcxYWJlNjMzYTcxMDllMzAwYjkzMTk4YzZiMTJkOGJhYzc4Ng==');
-  const AIRTABLE_BASE = (window.NF_CONFIG || {}).AIRTABLE_BASE || 'appgNChM14muzXCR2';
-  const AIRTABLE_TABLE = (window.NF_CONFIG || {}).AIRTABLE_TABLE || 'Sales%20Training%20Progress';
-  const ALERT_URL = (window.NF_CONFIG || {}).ALERT_URL || 'http://129.80.92.76:3141/send-alert';
 
   function calcProgressPct (d) {
     let checkedModules = 0;
@@ -1265,6 +1377,6 @@
   }
 
   // ─── Boot ──────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', passwordGate);
 
 })();

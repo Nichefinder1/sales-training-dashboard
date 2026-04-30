@@ -32,6 +32,24 @@
     </div>
   </header>
 
+  <!-- ========== PASSWORD GATE ========== -->
+  <div id="pw-gate" class="modal-overlay">
+    <div class="modal-box modal-sm">
+      <div class="pw-logo-wrap">
+        <img src="logo.png" alt="Nichefinders AI" class="pw-logo">
+        <span class="logo-subtitle">Sales Training Academy</span>
+      </div>
+      <h3 id="pw-title">Enter Password</h3>
+      <p class="modal-desc" id="pw-desc">Enter your password to access your training portal.</p>
+      <input type="password" id="pw-input" class="input" placeholder="Password" maxlength="128" autocomplete="off">
+      <input type="password" id="pw-confirm" class="input hidden" placeholder="Confirm password" maxlength="128" autocomplete="off" style="margin-top:8px">
+      <p id="pw-error" class="pw-error hidden"></p>
+      <div class="modal-actions">
+        <button id="pw-submit" class="btn btn-primary">Sign In</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== NAME MODAL ========== -->
   <div id="name-modal" class="modal-overlay hidden">
     <div class="modal-box modal-sm">
