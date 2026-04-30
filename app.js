@@ -1208,7 +1208,7 @@
   }
 
   // ─── Airtable Sync ─────────────────────────────────────────
-  const AIRTABLE_PAT = (window.NF_CONFIG || {}).AIRTABLE_PAT || atob('cGF0NzVzQ3kxeUVFbDNqOGkuNzU2ZjZiZWM4YmE0MGU4MTk4NmUyOTI5Y2E1ODlkYjIzYjY0NzRjOTQyNDUxZDhlMjExZDE4YjlkNzRiZDdmMg==');
+  const AIRTABLE_PAT = (window.NF_CONFIG || {}).AIRTABLE_PAT || atob('cGF0RTJwNTNSNkE2VUlJYTAuYjI5OWU3MGM0YTZlMzhlMzQ2YmU1NjZlODZhNDcxYWJlNjMzYTcxMDllMzAwYjkzMTk4YzZiMTJkOGJhYzc4Ng==');
   const AIRTABLE_BASE = (window.NF_CONFIG || {}).AIRTABLE_BASE || 'appgNChM14muzXCR2';
   const AIRTABLE_TABLE = (window.NF_CONFIG || {}).AIRTABLE_TABLE || 'Sales%20Training%20Progress';
   const ALERT_URL = (window.NF_CONFIG || {}).ALERT_URL || 'http://129.80.92.76:3141/send-alert';
