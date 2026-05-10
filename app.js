@@ -412,6 +412,18 @@
       descEl.textContent = 'Enter your password to access your training portal.';
       submitBtn.textContent = 'Sign In';
 
+      // Show forgot password link
+      const forgotLink = $('#pw-forgot-link');
+      const forgotBtn = $('#pw-forgot-btn');
+      const resetMsg = $('#pw-reset-msg');
+      if (forgotLink) forgotLink.classList.remove('hidden');
+      if (forgotBtn) {
+        forgotBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (resetMsg) resetMsg.classList.toggle('hidden');
+        });
+      }
+
       submitBtn.addEventListener('click', async function handler () {
         hidePwError();
         const pw = input.value;

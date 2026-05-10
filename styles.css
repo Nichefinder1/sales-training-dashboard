@@ -932,3 +932,22 @@ footer {
   font-size: .85rem;
   margin-top: 8px;
 }
+.pw-forgot {
+  text-align: center;
+  margin-top: 12px;
+  font-size: .85rem;
+}
+.pw-forgot a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.pw-forgot a:hover { text-decoration: underline; }
+.pw-reset-msg {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-size: .85rem;
+  text-align: center;
+  color: var(--text-dim);
+}
