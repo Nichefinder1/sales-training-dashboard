@@ -887,67 +887,11 @@ footer {
 /* ---------- Switch user items ---------- */
 .switch-user-item { text-transform: none; }
 
-/* ---------- Password Gate ---------- */
-#pw-gate {
+/* ---------- Clerk Auth Overlay ---------- */
+#clerk-auth {
   z-index: 9999;
   background: var(--bg);
-}
-.pw-logo-wrap {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-.pw-logo {
-  height: 72px;
-  width: auto;
-}
-.pw-logo-wrap .logo-subtitle {
-  font-size: .85rem;
-  color: var(--text-sec);
-  letter-spacing: .05em;
-  text-transform: uppercase;
-}
-#pw-gate .modal-box {
-  animation: fadeSlideIn .3s ease;
-}
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(-12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-#pw-gate .input {
-  width: 100%;
-}
-#pw-gate .modal-actions {
   justify-content: center;
-}
-#pw-gate .btn-primary {
-  width: 100%;
-  padding: 12px;
-  font-size: 1rem;
-}
-.pw-error {
-  color: var(--red);
-  font-size: .85rem;
-  margin-top: 8px;
-}
-.pw-forgot {
-  text-align: center;
-  margin-top: 12px;
-  font-size: .85rem;
-}
-.pw-forgot a {
-  color: var(--accent);
-  text-decoration: none;
-}
-.pw-forgot a:hover { text-decoration: underline; }
-.pw-reset-msg {
-  margin-top: 12px;
-  padding: 10px 14px;
-  background: var(--surface2);
-  border-radius: 8px;
-  font-size: .85rem;
-  text-align: center;
-  color: var(--text-dim);
 }
