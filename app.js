@@ -326,7 +326,8 @@
 
   // ─── App visibility ────────────────────────────────────────
   function showApp () {
-    $('#pw-gate').classList.add('hidden');
+    const gate = $('#pw-gate');
+    if (gate) gate.classList.add('hidden');
     document.querySelector('header').style.display = '';
     document.querySelector('main').style.display = '';
     document.querySelector('footer').style.display = '';
