@@ -9,7 +9,7 @@
   // ─── Multi-user: resolve active user from ?user= param ────
   const BASE_KEY = 'nf-sales-training';
   function getUser () {
-    return window._clerkUsername || new URLSearchParams(window.location.search).get('user') || 'default';
+    return window._authUsername || new URLSearchParams(window.location.search).get('user') || 'default';
   }
   function storageKey () { return BASE_KEY + ':' + getUser(); }
   function loadUser (user) {
@@ -1063,7 +1063,7 @@
     }
 
     const signOutBtn = $('#sign-out-btn');
-    if (signOutBtn) signOutBtn.onclick = () => window.Clerk && window.Clerk.signOut();
+    if (signOutBtn) signOutBtn.onclick = () => { nfAuth.signOut(); };
   }
 
   function openSwitchUser () {
@@ -1281,32 +1281,273 @@
     }).catch(() => {});
   }
 
-  // ─── Clerk Auth Boot ───────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', () => {
-    hideApp();
-    const poll = setInterval(async () => {
-      if (!window.Clerk) return;
-      clearInterval(poll);
-      await window.Clerk.load();
-      const clerkUser = window.Clerk.user;
-      if (clerkUser) {
-        showApp();
-        initWithClerkUser(clerkUser);
-      } else {
-        const overlay = document.getElementById('clerk-auth');
-        overlay.classList.remove('hidden');
-        window.Clerk.mountSignIn(overlay);
-        window.Clerk.addListener(({ user: u }) => {
-          if (u) { overlay.classList.add('hidden'); showApp(); initWithClerkUser(u); }
-        });
-      }
-    }, 50);
-  });
+  // ─── Self-Contained Auth ───────────────────────────────────
+  const SESSION_KEY = 'nf-auth-session';
+  const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-  function initWithClerkUser (clerkUser) {
-    const email = (clerkUser.primaryEmailAddress || {}).emailAddress || '';
-    window._clerkUsername = email.split('@')[0].toLowerCase() || 'default';
-    init();
+  async function sha256 (str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
+
+  const nfAuth = {
+    getSession () {
+      try {
+        const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+        if (s && s.user && s.expires > Date.now()) return s;
+      } catch (_) {}
+      return null;
+    },
+    setSession (user) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ user, expires: Date.now() + SESSION_TTL }));
+    },
+    signOut () {
+      localStorage.removeItem(SESSION_KEY);
+      location.reload();
+    },
+    async fetchRecord (username) {
+      const cfg = window.NF_CONFIG;
+      const url = `https://api.airtable.com/v0/${cfg.AIRTABLE_BASE}/${cfg.AIRTABLE_TABLE}?filterByFormula=${encodeURIComponent(`{User}="${username}"`)}`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${cfg.AIRTABLE_PAT}` } });
+      const d = await r.json();
+      return (d.records && d.records[0]) || null;
+    },
+    async setPasswordHash (recordId, hash) {
+      const cfg = window.NF_CONFIG;
+      await fetch(`https://api.airtable.com/v0/${cfg.AIRTABLE_BASE}/${cfg.AIRTABLE_TABLE}/${recordId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${cfg.AIRTABLE_PAT}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { 'Password Hash': hash } })
+      });
+    },
+    async sendResetEmail (username) {
+      const cfg = window.NF_CONFIG;
+      const email = cfg.USER_EMAILS[username];
+      if (!email) return false;
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+      const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
+      const record = await this.fetchRecord(username);
+      if (!record) return false;
+      await this.setPasswordHash(record.id, `RESET|${token}|${expiry}`);
+      const resetUrl = `${location.origin}${location.pathname}?reset=${token}&user=${encodeURIComponent(username)}`;
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cfg.RESEND_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Nichefinders Training <training@nichefinders.ai>',
+          to: email,
+          subject: 'Sales Training — Password Reset',
+          html: `<p>Hi ${username},</p><p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you didn't request this, ignore this email.</p>`
+        })
+      });
+      return true;
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    hideApp();
+
+    const params = new URLSearchParams(location.search);
+    const resetToken = params.get('reset');
+    const resetUser = params.get('user');
+
+    // ── Active session ──
+    const session = nfAuth.getSession();
+    if (session && !resetToken) {
+      window._authUsername = session.user;
+      showApp();
+      init();
+      return;
+    }
+
+    // ── Show auth overlay ──
+    const overlay = document.getElementById('auth-overlay');
+    overlay.style.display = 'flex';
+
+    const title = document.getElementById('auth-title');
+    const desc = document.getElementById('auth-desc');
+    const errEl = document.getElementById('auth-error');
+    const successEl = document.getElementById('auth-success');
+    const loginFields = document.getElementById('auth-login-fields');
+    const newPwFields = document.getElementById('auth-new-pw-fields');
+    const forgotFields = document.getElementById('auth-forgot-fields');
+    const submitBtn = document.getElementById('auth-submit');
+    const secondaryBtn = document.getElementById('auth-secondary');
+
+    function showError (msg) { errEl.textContent = msg; errEl.style.display = ''; successEl.style.display = 'none'; }
+    function showSuccess (msg) { successEl.textContent = msg; successEl.style.display = ''; errEl.style.display = 'none'; }
+    function clearMessages () { errEl.textContent = ''; errEl.style.display = 'none'; successEl.style.display = 'none'; }
+
+    // ── Reset password mode ──
+    if (resetToken && resetUser) {
+      title.textContent = 'Set New Password';
+      desc.textContent = 'Enter your new password below.';
+      loginFields.style.display = 'none';
+      newPwFields.style.display = '';
+      forgotFields.style.display = 'none';
+      secondaryBtn.style.display = 'none';
+      submitBtn.textContent = 'Set Password';
+
+      submitBtn.onclick = async () => {
+        const pw = document.getElementById('auth-new-password').value.trim();
+        const pw2 = document.getElementById('auth-confirm-password').value.trim();
+        if (!pw || pw.length < 6) return showError('Password must be at least 6 characters.');
+        if (pw !== pw2) return showError('Passwords do not match.');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving…';
+        try {
+          const record = await nfAuth.fetchRecord(resetUser);
+          if (!record) return showError('User not found.');
+          const stored = record.fields['Password Hash'] || '';
+          if (!stored.startsWith('RESET|')) return showError('Reset link already used.');
+          const parts = stored.split('|');
+          if (parts[1] !== resetToken) return showError('Invalid reset link.');
+          if (Date.now() > parseInt(parts[2], 10)) return showError('Reset link expired. Request a new one.');
+          const hash = await sha256(resetUser + ':' + pw);
+          await nfAuth.setPasswordHash(record.id, hash);
+          history.replaceState({}, '', location.pathname);
+          nfAuth.setSession(resetUser);
+          window._authUsername = resetUser;
+          overlay.style.display = 'none';
+          showApp();
+          init();
+        } catch (_) {
+          showError('Something went wrong. Try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Set Password';
+        }
+      };
+      return;
+    }
+
+    // ── Normal login mode ──
+    let mode = 'login';
+
+    secondaryBtn.onclick = () => {
+      clearMessages();
+      if (mode === 'login' || mode === 'set-password') {
+        mode = 'forgot';
+        title.textContent = 'Reset Password';
+        desc.textContent = 'Enter your username and we\'ll email you a reset link.';
+        loginFields.style.display = 'none';
+        newPwFields.style.display = 'none';
+        forgotFields.style.display = '';
+        submitBtn.textContent = 'Send Reset Email';
+        secondaryBtn.textContent = 'Back to sign in';
+      } else {
+        mode = 'login';
+        title.textContent = 'Sales Training Academy';
+        desc.textContent = 'Sign in to continue.';
+        loginFields.style.display = '';
+        newPwFields.style.display = 'none';
+        forgotFields.style.display = 'none';
+        submitBtn.textContent = 'Sign In';
+        secondaryBtn.textContent = 'Forgot password?';
+      }
+    };
+
+    submitBtn.onclick = async () => {
+      clearMessages();
+      submitBtn.disabled = true;
+
+      if (mode === 'forgot') {
+        const username = document.getElementById('auth-forgot-username').value.trim().toLowerCase();
+        if (!username) { showError('Enter your username.'); submitBtn.disabled = false; return; }
+        submitBtn.textContent = 'Sending…';
+        try {
+          const sent = await nfAuth.sendResetEmail(username);
+          if (sent) {
+            showSuccess('Reset link sent! Check your email.');
+          } else {
+            showError('Username not found or email unavailable.');
+          }
+        } catch (_) {
+          showError('Failed to send. Try again.');
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Reset Email';
+        return;
+      }
+
+      if (mode === 'set-password') {
+        const pw = document.getElementById('auth-new-password').value.trim();
+        const pw2 = document.getElementById('auth-confirm-password').value.trim();
+        const username = document.getElementById('auth-username').value.trim().toLowerCase();
+        if (!pw || pw.length < 6) { showError('Password must be at least 6 characters.'); submitBtn.disabled = false; submitBtn.textContent = 'Set Password'; return; }
+        if (pw !== pw2) { showError('Passwords do not match.'); submitBtn.disabled = false; submitBtn.textContent = 'Set Password'; return; }
+        submitBtn.textContent = 'Saving…';
+        try {
+          const record = await nfAuth.fetchRecord(username);
+          const hash = await sha256(username + ':' + pw);
+          await nfAuth.setPasswordHash(record.id, hash);
+          nfAuth.setSession(username);
+          window._authUsername = username;
+          overlay.style.display = 'none';
+          showApp();
+          init();
+        } catch (_) {
+          showError('Failed to save password. Try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Set Password';
+        }
+        return;
+      }
+
+      // mode === 'login'
+      const username = document.getElementById('auth-username').value.trim().toLowerCase();
+      const password = document.getElementById('auth-password').value;
+      submitBtn.textContent = 'Signing in…';
+
+      if (!username || !password) {
+        showError('Enter your username and password.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+        return;
+      }
+
+      try {
+        const record = await nfAuth.fetchRecord(username);
+        if (!record) { showError('Username not found.'); submitBtn.disabled = false; submitBtn.textContent = 'Sign In'; return; }
+
+        const storedHash = record.fields['Password Hash'] || '';
+
+        if (!storedHash || storedHash.startsWith('RESET|')) {
+          // First login — prompt to set password
+          mode = 'set-password';
+          title.textContent = 'Set Your Password';
+          desc.textContent = 'Welcome! Set a password to secure your account.';
+          loginFields.style.display = 'none';
+          newPwFields.style.display = '';
+          forgotFields.style.display = 'none';
+          submitBtn.textContent = 'Set Password';
+          submitBtn.disabled = false;
+          secondaryBtn.textContent = 'Back to sign in';
+          return;
+        }
+
+        const hash = await sha256(username + ':' + password);
+        if (hash !== storedHash) {
+          showError('Incorrect password.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Sign In';
+          return;
+        }
+
+        nfAuth.setSession(username);
+        window._authUsername = username;
+        overlay.style.display = 'none';
+        showApp();
+        init();
+      } catch (_) {
+        showError('Connection error. Try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+      }
+    };
+
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitBtn.click();
+    });
+  });
 
 })();
