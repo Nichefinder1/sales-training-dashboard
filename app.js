@@ -1320,6 +1320,14 @@
         body: JSON.stringify({ fields: { 'Password Hash': hash } })
       });
     },
+    async setResetToken (recordId, tokenValue) {
+      const cfg = window.NF_CONFIG;
+      await fetch(`https://api.airtable.com/v0/${cfg.AIRTABLE_BASE}/${cfg.AIRTABLE_TABLE}/${recordId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${cfg.AIRTABLE_PAT}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { 'Reset Token': tokenValue } })
+      });
+    },
     async sendResetEmail (username) {
       const cfg = window.NF_CONFIG;
       const email = cfg.USER_EMAILS[username];
@@ -1328,7 +1336,7 @@
       const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
       const record = await this.fetchRecord(username);
       if (!record) return false;
-      await this.setPasswordHash(record.id, `RESET|${token}|${expiry}`);
+      await this.setResetToken(record.id, `${token}|${expiry}`);
       const resetUrl = `${location.origin}${location.pathname}?reset=${token}&user=${encodeURIComponent(username)}`;
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -1398,13 +1406,14 @@
         try {
           const record = await nfAuth.fetchRecord(resetUser);
           if (!record) return showError('User not found.');
-          const stored = record.fields['Password Hash'] || '';
-          if (!stored.startsWith('RESET|')) return showError('Reset link already used.');
+          const stored = record.fields['Reset Token'] || '';
+          if (!stored) return showError('Reset link already used.');
           const parts = stored.split('|');
-          if (parts[1] !== resetToken) return showError('Invalid reset link.');
-          if (Date.now() > parseInt(parts[2], 10)) return showError('Reset link expired. Request a new one.');
+          if (parts[0] !== resetToken) return showError('Invalid reset link.');
+          if (Date.now() > parseInt(parts[1], 10)) return showError('Reset link expired. Request a new one.');
           const hash = await sha256(resetUser + ':' + pw);
           await nfAuth.setPasswordHash(record.id, hash);
+          await nfAuth.setResetToken(record.id, '');
           history.replaceState({}, '', location.pathname);
           nfAuth.setSession(resetUser);
           window._authUsername = resetUser;
